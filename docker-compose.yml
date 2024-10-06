@@ -1,0 +1,53 @@
+version: '3.9'
+
+services:
+   db:
+    image: postgres:15.2
+    restart: always
+    env_file: .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./conf/db/scripts:/docker-entrypoint-initdb.d
+      - ./conf/db/data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+   api:
+     build:
+       context: ./api
+       dockerfile: Dockerfile
+     command: uvicorn api:create_app --host 0.0.0.0 --port 5000
+     volumes:
+       - ./api:/code/api
+     ports:
+       - 5000:5000
+     env_file:
+       - .env
+     links:
+       - db
+       - redis
+     depends_on:
+       - db
+       - redis
+   bot:
+     build:
+       context: ./bot
+       dockerfile: Dockerfile
+     volumes:
+       - .//bot:/code
+     command: python /code/bot.py
+     env_file:
+       - .env
+     links:
+       - api
+     depends_on:
+       - api
+   redis:
+     image: redis:7.0-alpine
+   nginx:
+     build: ./nginx
+     network_mode: host
+     depends_on:
+       - api
